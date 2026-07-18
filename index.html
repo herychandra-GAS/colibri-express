@@ -1024,15 +1024,11 @@ function renderHeaderStats(){
   const isLiveActive = (t) => (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS) && t.queued !== true;
   const activeCount = allTasks.filter(isLiveActive).length;
   const urgentCount = allTasks.filter(t => isLiveActive(t) && t.urgency === "urgent").length;
-  const runnerIds = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
-  const onlineCount = runnerIds.filter(id => lastLocationAge(id) < STALE_LOCATION_MS).length;
 
   document.getElementById("header-stats").innerHTML = `
     <div class="header-stat"><strong>${activeCount}</strong> active</div>
     <div class="header-stat-sep"></div>
     <div class="header-stat stat-urgent"><strong>${urgentCount}</strong> urgent</div>
-    <div class="header-stat-sep"></div>
-    <div class="header-stat stat-online"><span class="stat-dot" style="background:var(--green); box-shadow:0 0 4px var(--green);"></span><strong>${onlineCount}</strong>/${runnerIds.length} runners online</div>
   `;
 }
 
