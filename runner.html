@@ -669,9 +669,31 @@ function startLocationSharing(uid){
     return;
   }
 
+  // Status starts in a "waiting" state — we only flip to "on" once a real
+  // GPS fix comes back, so the pill can't lie about sharing being active
+  // when the permission was actually denied or GPS never resolved.
+  document.getElementById("loc-status-text").textContent = "Waiting for GPS fix…";
+  document.getElementById("loc-status-pill").classList.add("off");
+
   watchId = navigator.geolocation.watchPosition(
-    (pos) => { lastPosition = pos; },
-    (err) => { console.warn("Geolocation watch error:", err); },
+    (pos) => {
+      lastPosition = pos;
+      document.getElementById("loc-status-text").textContent = "Location sharing on";
+      document.getElementById("loc-status-pill").classList.remove("off");
+    },
+    (err) => {
+      console.warn("Geolocation watch error:", err);
+      let msg = "Location error — sharing is off";
+      if (err.code === err.PERMISSION_DENIED){
+        msg = "Location permission denied — enable it in your browser/site settings";
+      } else if (err.code === err.POSITION_UNAVAILABLE){
+        msg = "Can't get a GPS fix — check that location services are on";
+      } else if (err.code === err.TIMEOUT){
+        msg = "GPS timed out — retrying…";
+      }
+      document.getElementById("loc-status-text").textContent = msg;
+      document.getElementById("loc-status-pill").classList.add("off");
+    },
     { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
   );
 
@@ -686,14 +708,13 @@ function startLocationSharing(uid){
       });
     } catch (e) {
       console.error("Failed to push location:", e);
+      document.getElementById("loc-status-text").textContent = "Couldn't reach server — retrying…";
+      document.getElementById("loc-status-pill").classList.add("off");
     }
   };
 
   pushLocation();
   pingIntervalId = setInterval(pushLocation, LOCATION_PING_INTERVAL_MS);
-
-  document.getElementById("loc-status-text").textContent = "Location sharing on";
-  document.getElementById("loc-status-pill").classList.remove("off");
 }
 
 function stopLocationSharing(){
