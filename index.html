@@ -656,7 +656,7 @@
 
     <label class="field-label">Release date <span class="field-label-optional">(optional)</span></label>
     <input type="date" id="task-release-date">
-    <div class="field-hint" id="release-date-hint">Task stays queued until this date, then moves to Active automatically.</div>
+    <div class="field-hint" id="release-date-hint">Task stays queued until 8:30 AM on this date, then moves to Active automatically.</div>
 
     <div class="modal-actions">
       <button class="btn-cancel" id="cancel-task">Cancel</button>
@@ -964,19 +964,23 @@ function subscribeTasks(){
 }
 
 // Queued tasks with a releaseDate ("YYYY-MM-DD") automatically move to
-// Active once that calendar date arrives — compared as local dates, not
-// exact timestamps, since there's no time component on the field. This
-// only fires while a dispatcher has the app open (no server-side cron),
-// so a task can sit queued a little past its date if nobody's looking;
-// it always catches up the moment the app is next opened or this check
-// next runs.
+// Active once 8:30 AM local time on that date has passed — compared as
+// exact local timestamps (releaseDate at 08:30), not just calendar dates.
+// This only fires while a dispatcher has the app open (no server-side cron),
+// so a task can sit queued a little past 8:30 if nobody's looking; it always
+// catches up the moment the app is next opened or this check next runs.
+const RELEASE_HOUR_LOCAL = 8;
+const RELEASE_MINUTE_LOCAL = 30;
 let releaseCheckInFlight = false;
 async function releaseDueTasks(){
   if (releaseCheckInFlight) return;
-  const todayStr = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local time
-  const due = Object.values(tasksById).filter(t =>
-    t.queued === true && t.releaseDate && t.releaseDate <= todayStr
-  );
+  const now = new Date();
+  const due = Object.values(tasksById).filter(t => {
+    if (t.queued !== true || !t.releaseDate) return false;
+    const [y, m, d] = t.releaseDate.split("-").map(Number);
+    const releaseAt = new Date(y, m - 1, d, RELEASE_HOUR_LOCAL, RELEASE_MINUTE_LOCAL, 0, 0);
+    return now >= releaseAt;
+  });
   if (due.length === 0) return;
 
   releaseCheckInFlight = true;
@@ -1446,7 +1450,7 @@ function resetTaskForm(){
   }
 }
 
-const DEFAULT_RELEASE_HINT = "Task stays queued until this date, then moves to Active automatically.";
+const DEFAULT_RELEASE_HINT = "Task stays queued until 8:30 AM on this date, then moves to Active automatically.";
 const REQUEUE_RELEASE_HINT = "This task is currently active. Setting a date here will move it back to Queued until then.";
 let editingTaskWasActive = false;
 
