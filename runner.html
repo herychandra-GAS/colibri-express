@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Colibri Runner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#060c18; --surface:#09111f; --surface2:#0d1828;
+    --border:#152035; --border2:#1e3050;
+    --ink:#c8d8ee; --ink-dim:#7a9abb; --ink-faint:#4a6888;
+    --amber:#f0a500; --amber-dim:#f0a50018;
+    --teal:#00c9a7; --teal-dim:#00c9a714;
+    --green:#4ade80; --green-dim:#4ade8014;
+    --rose:#fb7185; --rose-dim:#fb718514;
+    --blue:#38bdf8; --purple:#a78bfa;
+    --navy-0:var(--bg); --navy-1:var(--surface); --navy-2:var(--surface2); --navy-3:#122036;
+    --line:var(--border); --line-soft:var(--border);
+    --cyan:var(--teal); --red:var(--rose); --amber-dim2:#b87a18;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%; overflow-x:hidden;}
+  body{
+    background:var(--navy-0);
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size:40px 40px;
+    color:var(--ink);
+    font-family:'Rajdhani',sans-serif;
+    font-weight:500;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .display{font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.01em;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:500;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    font-size:11px;
+    color:var(--ink-faint);
+  }
+
+  .screen{display:none; min-height:100vh; flex-direction:column;}
+  .screen.active{display:flex;}
+
+  /* ---------- Login ---------- */
+  #login-screen{align-items:center; justify-content:center; padding:32px 24px;}
+  .login-card{width:100%; max-width:360px;}
+  .brand{display:flex; align-items:center; gap:10px; margin-bottom:36px;}
+  .brand-mark{
+    width:36px;height:36px;border-radius:6px;
+    background:var(--navy-3); border:1px solid var(--amber-dim2);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;color:var(--amber);
+  }
+  .brand-name{font-size:15px; font-weight:600; letter-spacing:0.02em; color:var(--ink);}
+  .logo-dot{width:7px;height:7px;background:var(--amber);border-radius:50%;box-shadow:0 0 8px var(--amber);animation:pdot 2s ease-in-out infinite; flex-shrink:0;}
+  @keyframes pdot{0%,100%{opacity:1;box-shadow:0 0 8px var(--amber);}50%{opacity:.5;box-shadow:0 0 16px var(--amber);}}
+  .brand-sub{font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-faint); letter-spacing:0.1em; text-transform:uppercase;}
+  h1.login-title{font-size:34px; margin:0 0 6px; line-height:1.05; color:var(--ink);}
+  .login-desc{color:var(--ink-dim); font-size:14px; margin:0 0 28px; line-height:1.5;}
+  input{
+    width:100%;
+    background:var(--navy-1);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:14px 16px;
+    color:var(--ink);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    margin-bottom:12px;
+    outline:none;
+    transition:border-color 0.15s ease;
+  }
+  input::placeholder{color:var(--ink-faint);}
+  input:focus{border-color:var(--amber);}
+  button{
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:600;
+    letter-spacing:0.03em;
+    cursor:pointer;
+    border:none;
+  }
+  .btn-primary{
+    width:100%;
+    background:var(--amber);
+    color:var(--navy-0);
+    padding:15px;
+    border-radius:6px;
+    font-size:17px;
+    margin-top:8px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+  }
+  .btn-primary:active{transform:scale(0.98);}
+  .btn-primary:disabled{opacity:0.5;}
+  .btn-cancel-full{
+    width:100%;
+    background:var(--navy-2); border:1px solid var(--line);
+    color:var(--ink-dim);
+    padding:14px;
+    border-radius:6px;
+    font-size:14px;
+    margin-top:8px;
+    text-transform:uppercase; letter-spacing:0.04em;
+  }
+  .login-error{
+    color:var(--red);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    margin-top:12px;
+    min-height:18px;
+  }
+
+  .runner-picker{display:flex; flex-direction:column; gap:8px;}
+  .runner-picker-item{
+    display:flex; align-items:center; gap:12px; width:100%;
+    padding:13px 14px; border-radius:8px; border:1px solid var(--line);
+    background:var(--navy-2); color:var(--ink); cursor:pointer; text-align:left;
+    font-family:'Rajdhani',sans-serif; font-weight:600; font-size:16px;
+    transition:border-color 0.15s ease, background 0.15s ease;
+  }
+  .runner-picker-item:hover{border-color:var(--amber);}
+  .runner-picker-item:active{transform:scale(0.98);}
+  .runner-picker-avatar{
+    width:34px;height:34px;border-radius:50%; flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;
+  }
+
+  .pin-dots{display:flex; justify-content:center; gap:14px; margin:28px 0 32px;}
+  .pin-dot{
+    width:16px; height:16px; border-radius:50%; border:2px solid var(--line);
+    background:transparent; transition:background 0.15s ease, border-color 0.15s ease;
+  }
+  .pin-dot.filled{background:var(--amber); border-color:var(--amber);}
+  .pin-dot.error{background:var(--red); border-color:var(--red);}
+
+  .pin-keypad{
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-bottom:20px;
+  }
+  .pin-keypad button{
+    aspect-ratio:1; border-radius:50%; border:1px solid var(--line);
+    background:var(--navy-2); color:var(--ink); font-size:22px; font-weight:600;
+    font-family:'Barlow Condensed',sans-serif;
+  }
+  .pin-keypad button:active{background:var(--navy-3); transform:scale(0.94);}
+  .pin-key-ghost{background:transparent !important; border:none !important; pointer-events:none;}
+
+  /* ---------- Manifest screen ---------- */
+  #manifest-screen{}
+  .topbar{
+    background:linear-gradient(180deg,#0d1018 0%,var(--bg) 100%); border-bottom:1px solid var(--border2);
+    padding:18px 20px 20px;
+    position:sticky; top:0; z-index:5;
+  }
+  .topbar-row{display:flex; justify-content:space-between; align-items:flex-start;}
+  .greet{font-size:24px; margin:2px 0 2px; color:var(--ink);}
+  .status-pill{
+    display:inline-flex; align-items:center; gap:7px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase;
+    padding:5px 10px; border-radius:4px;
+    background:var(--navy-2); border:1px solid rgba(74,222,128,0.3); color:var(--green);
+    margin-top:8px;
+  }
+  .status-dot{width:6px;height:6px;border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green);}
+  .status-pill.off{background:var(--navy-2); border-color:var(--line); color:var(--ink-faint);}
+  .status-pill.off .status-dot{background:var(--ink-faint); box-shadow:none;}
+  .logout-btn{
+    background:transparent; color:var(--ink-faint); font-size:11.5px;
+    font-family:'IBM Plex Mono',monospace; letter-spacing:0.04em; padding:6px 0;
+    text-transform:uppercase;
+  }
+
+  .manifest-body{padding:20px 16px 100px;}
+  .section-label{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin:22px 4px 10px;
+  }
+  .count-badge{
+    font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;
+    color:var(--ink-faint);
+  }
+
+  .task-card{
+    background:var(--navy-2);
+    border-radius:8px;
+    margin-bottom:12px;
+    position:relative;
+    border:1px solid var(--line);
+    overflow:hidden;
+  }
+  .task-card::before{
+    content:"";
+    position:absolute; left:0; top:0; bottom:0; width:3px;
+  }
+  .task-card.status-pending::before{background:var(--amber);}
+  .task-card.status-in_progress::before{background:var(--cyan);}
+  .task-card.status-delivered::before{background:var(--green);}
+  .task-card.status-failed::before{background:var(--red);}
+
+  .task-inner{padding:16px 16px 16px 20px;}
+  .task-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .task-item{font-size:17px; font-weight:600; line-height:1.3; color:var(--ink);}
+  .task-badge{
+    font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:10px;
+    letter-spacing:0.06em; text-transform:uppercase;
+    padding:4px 8px; border-radius:4px; white-space:nowrap; border:1px solid;
+  }
+  .badge-pending{background:rgba(245,166,35,0.1); color:var(--amber); border-color:rgba(245,166,35,0.35);}
+  .badge-in_progress{background:rgba(62,214,208,0.1); color:var(--cyan); border-color:rgba(62,214,208,0.35);}
+  .badge-delivered{background:rgba(74,222,128,0.1); color:var(--green); border-color:rgba(74,222,128,0.35);}
+  .badge-failed{background:rgba(242,84,91,0.1); color:var(--red); border-color:rgba(242,84,91,0.35);}
+  .badge-urgent{background:rgba(251,113,133,0.15); color:var(--rose); border-color:rgba(251,113,133,0.45);}
+
+  .task-addr{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--ink-dim); margin-top:6px; line-height:1.4;}
+  .task-recipient{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--ink-faint); margin-top:3px;}
+  .task-notes{
+    font-size:13px; color:var(--ink-dim); margin-top:10px; padding:8px 10px;
+    background:var(--navy-1); border-left:2px solid var(--line); border-radius:3px;
+    font-style:italic; line-height:1.4;
+  }
+  .task-dates{
+    display:flex; gap:12px; flex-wrap:wrap; margin-top:10px;
+    font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-faint);
+  }
+  .task-perf{
+    height:1px; margin:14px 0;
+    background-image:repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px);
+  }
+  .task-actions{display:flex; gap:8px;}
+  .task-actions button{
+    flex:1; padding:11px; border-radius:6px; font-size:13.5px;
+    text-transform:uppercase; letter-spacing:0.03em;
+  }
+  .act-start{background:var(--amber); color:var(--navy-0);}
+  .act-done{background:var(--green); color:var(--navy-0);}
+  .act-fail{background:transparent; color:var(--red); border:1px solid rgba(242,84,91,0.4) !important;}
+
+  .empty-state{
+    text-align:center; padding:60px 20px; color:var(--ink-faint);
+  }
+  .empty-state .display{font-size:20px; margin-bottom:6px; color:var(--ink-dim);}
+  .empty-state p{font-size:13px; margin:0; font-family:'IBM Plex Mono',monospace;}
+
+  .loc-footer{
+    position:fixed; bottom:0; left:0; right:0;
+    background:rgba(16,21,31,0.95); backdrop-filter:blur(8px);
+    border-top:1px solid var(--line);
+    padding:12px 20px; padding-bottom:calc(12px + env(safe-area-inset-bottom));
+    display:flex; align-items:center; gap:8px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px; color:var(--ink-dim);
+  }
+  .loc-pulse{
+    width:8px;height:8px;border-radius:50%; background:var(--green);
+    box-shadow:0 0 6px var(--green);
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{
+    0%,100%{opacity:1;} 50%{opacity:0.3;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .loc-pulse{animation:none;}
+  }
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="screen active">
+  <div class="login-card">
+    <div class="brand">
+      <div class="logo-dot"></div>
+      <div class="brand-mark">C</div>
+      <div>
+        <div class="brand-name">COLIBRI RUNNER</div>
+        <div class="brand-sub">Delivery Terminal</div>
+      </div>
+    </div>
+    <h1 class="login-title display">Who's this?</h1>
+    <p class="login-desc">Pick your name to continue.</p>
+    <div class="runner-picker" id="runner-picker"></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div id="pin-screen" class="screen">
+  <div class="login-card">
+    <div class="brand">
+      <div class="logo-dot"></div>
+      <div class="brand-mark" id="pin-avatar">?</div>
+      <div>
+        <div class="brand-name" id="pin-runner-name">—</div>
+        <div class="brand-sub">Enter your PIN</div>
+      </div>
+    </div>
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+      <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+    <div class="pin-keypad" id="pin-keypad">
+      <button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button>
+      <button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button>
+      <button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button>
+      <button class="pin-key-ghost"></button><button data-key="0">0</button><button data-key="back">⌫</button>
+    </div>
+    <button class="btn-cancel-full" id="pin-back-btn">Not you? Go back</button>
+    <div class="login-error" id="pin-error"></div>
+  </div>
+</div>
+
+<div id="manifest-screen" class="screen">
+  <div class="topbar">
+    <div class="topbar-row">
+      <div>
+        <div class="eyebrow">Today's manifest</div>
+        <div class="greet display" id="greet-name">—</div>
+        <div class="status-pill" id="loc-status-pill">
+          <div class="status-dot"></div>
+          <span id="loc-status-text">Location sharing on</span>
+        </div>
+      </div>
+      <button class="logout-btn" id="logout-btn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="manifest-body">
+    <div class="section-label">
+      <span class="eyebrow">Active tasks</span>
+      <span class="count-badge mono" id="active-count">0</span>
+    </div>
+    <div id="active-tasks"></div>
+
+    <div class="section-label">
+      <span class="eyebrow">Completed today</span>
+      <span class="count-badge mono" id="done-count">0</span>
+    </div>
+    <div id="done-tasks"></div>
+  </div>
+
+  <div class="loc-footer">
+    <div class="loc-pulse" id="loc-pulse"></div>
+    <span id="loc-footer-text">Sending your location every 25s while this tab is open</span>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, setDoc, updateDoc,
+  collection, query, where, onSnapshot, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCzdSRDykLVhCMLYXykhbnaVlNq64f3GE8",
+  authDomain: "colibri-express.firebaseapp.com",
+  projectId: "colibri-express",
+  storageBucket: "colibri-express.firebasestorage.app",
+  messagingSenderId: "960627210298",
+  appId: "1:960627210298:web:369a23c269207c7cb05d03"
+};
+
+const TASK_STATUS = {
+  PENDING: "pending",
+  IN_PROGRESS: "in_progress",
+  DELIVERED: "delivered",
+  FAILED: "failed"
+};
+const LOCATION_PING_INTERVAL_MS = 25000;
+const SESSION_STORAGE_KEY = "colibri_runner_session";
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// This is a lightweight client-side PIN check, not real authentication —
+// see project notes. Runner identity here is just a Firestore document ID,
+// nothing tied to a real login session the way Firebase Auth would provide.
+let currentRunner = null; // { id, name }
+let watchId = null;
+let pingIntervalId = null;
+let lastPosition = null;
+let runnersCache = {};
+let selectedRunnerForPin = null;
+let pinDigits = "";
+
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+async function hashPin(pin){
+  const data = new TextEncoder().encode(pin);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function renderRunnerPicker(){
+  const el = document.getElementById("runner-picker");
+  const ids = Object.keys(runnersCache);
+  el.innerHTML = ids.length
+    ? ids.map(id => {
+        const r = runnersCache[id];
+        const initial = (r.name || "?").charAt(0).toUpperCase();
+        return `
+          <button type="button" class="runner-picker-item" data-runner-id="${id}">
+            <div class="runner-picker-avatar" style="background:var(--amber-dim2, #b87a18); color:var(--navy-0);">${initial}</div>
+            <span>${escapeHTML(r.name || "Runner")}</span>
+          </button>`;
+      }).join("")
+    : `<div class="login-desc" style="margin:0;">No runners set up yet. Ask your dispatcher to add you.</div>`;
+
+  el.querySelectorAll("[data-runner-id]").forEach(btn => {
+    btn.addEventListener("click", () => openPinScreen(btn.dataset.runnerId));
+  });
+}
+
+function openPinScreen(runnerId){
+  selectedRunnerForPin = runnerId;
+  pinDigits = "";
+  const r = runnersCache[runnerId];
+  document.getElementById("pin-runner-name").textContent = r?.name || "Runner";
+  document.getElementById("pin-avatar").textContent = (r?.name || "?").charAt(0).toUpperCase();
+  document.getElementById("pin-error").textContent = "";
+  updatePinDots();
+  showScreen("pin-screen");
+}
+
+function updatePinDots(errorState){
+  const dots = document.querySelectorAll(".pin-dot");
+  dots.forEach((dot, i) => {
+    dot.classList.toggle("filled", i < pinDigits.length && !errorState);
+    dot.classList.toggle("error", !!errorState);
+  });
+}
+
+document.getElementById("pin-back-btn").addEventListener("click", () => {
+  selectedRunnerForPin = null;
+  pinDigits = "";
+  showScreen("login-screen");
+});
+
+document.getElementById("pin-keypad").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-key]");
+  if (!btn) return;
+  const key = btn.dataset.key;
+
+  if (key === "back"){
+    pinDigits = pinDigits.slice(0, -1);
+    updatePinDots();
+    return;
+  }
+  if (pinDigits.length >= 6) return;
+
+  pinDigits += key;
+  updatePinDots();
+
+  if (pinDigits.length === 6){
+    await verifyPin();
+  }
+});
+
+async function verifyPin(){
+  const errEl = document.getElementById("pin-error");
+  const runner = runnersCache[selectedRunnerForPin];
+  if (!runner){
+    errEl.textContent = "Something went wrong — go back and try again.";
+    return;
+  }
+
+  const enteredHash = await hashPin(pinDigits);
+  if (enteredHash !== runner.pinHash){
+    updatePinDots(true);
+    errEl.textContent = "Incorrect PIN — try again.";
+    setTimeout(() => { pinDigits = ""; updatePinDots(); }, 400);
+    return;
+  }
+
+  errEl.textContent = "";
+  currentRunner = { id: selectedRunnerForPin, name: runner.name };
+  try {
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(currentRunner));
+  } catch (e) { /* localStorage unavailable — session just won't persist across reloads */ }
+
+  enterManifest();
+}
+
+function enterManifest(){
+  document.getElementById("greet-name").textContent = currentRunner.name;
+  showScreen("manifest-screen");
+  subscribeToTasks(currentRunner.id);
+  startLocationSharing(currentRunner.id);
+}
+
+document.getElementById("logout-btn").addEventListener("click", () => {
+  stopLocationSharing();
+  currentRunner = null;
+  selectedRunnerForPin = null;
+  pinDigits = "";
+  try { localStorage.removeItem(SESSION_STORAGE_KEY); } catch (e) {}
+  showScreen("login-screen");
+});
+
+// Live list of runners (dispatcher-managed), used both for the name picker
+// and for re-validating a restored session below.
+onSnapshot(collection(db, "employees"), (snap) => {
+  runnersCache = {};
+  snap.forEach(d => {
+    const data = d.data();
+    if (data.role === "dispatcher") return;
+    runnersCache[d.id] = data;
+  });
+
+  if (!currentRunner){
+    renderRunnerPicker();
+  }
+});
+
+// Restore a previous session (if any) once the runner list has loaded, so
+// a runner doesn't have to re-enter their PIN every time they reopen the
+// app on their own phone.
+(function tryRestoreSession(){
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (!saved?.id) return;
+    // Wait briefly for the employees snapshot above to populate before
+    // trusting the saved session — if the runner was deleted by dispatch
+    // in the meantime, fall back to the picker instead of a broken session.
+    setTimeout(() => {
+      if (runnersCache[saved.id]){
+        currentRunner = { id: saved.id, name: runnersCache[saved.id].name || saved.name };
+        enterManifest();
+      }
+    }, 600);
+  } catch (e) { /* ignore malformed/unavailable storage */ }
+})();
+
+function subscribeToTasks(uid){
+  const q = query(collection(db, "tasks"), where("assignedTo", "==", uid));
+  onSnapshot(q, (snapshot) => {
+    const tasks = [];
+    // Tasks marked "queued" by the dispatcher aren't released to the runner
+    // yet — this keeps the courier's list focused on what they should
+    // actually act on right now.
+    snapshot.forEach(d => {
+      const data = d.data();
+      if (data.queued === true) return;
+      tasks.push({ id: d.id, ...data });
+    });
+    renderTasks(tasks);
+  }, (err) => {
+    console.error("Task subscription error:", err);
+  });
+}
+
+function renderTasks(tasks){
+  const active = tasks.filter(t => t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS);
+  const done = tasks.filter(t => t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED);
+
+  active.sort((a,b) => {
+    const statusDiff = (a.status === TASK_STATUS.IN_PROGRESS ? -1 : 1) - (b.status === TASK_STATUS.IN_PROGRESS ? -1 : 1);
+    if (statusDiff !== 0) return statusDiff;
+    return (a.urgency === "urgent" ? -1 : 1) - (b.urgency === "urgent" ? -1 : 1);
+  });
+
+  document.getElementById("active-count").textContent = active.length;
+  document.getElementById("done-count").textContent = done.length;
+
+  document.getElementById("active-tasks").innerHTML = active.length
+    ? active.map(taskCardHTML).join("")
+    : `<div class="empty-state"><div class="display">All clear</div><p>No active tasks right now.</p></div>`;
+
+  document.getElementById("done-tasks").innerHTML = done.length
+    ? done.map(taskCardHTML).join("")
+    : `<div class="empty-state" style="padding:24px 20px;"><p>Nothing completed yet today.</p></div>`;
+
+  document.querySelectorAll("[data-action]").forEach(btn => {
+    btn.addEventListener("click", () => handleTaskAction(btn.dataset.taskId, btn.dataset.action));
+  });
+}
+
+const statusLabel = {
+  [TASK_STATUS.PENDING]: "Pending",
+  [TASK_STATUS.IN_PROGRESS]: "In progress",
+  [TASK_STATUS.DELIVERED]: "Delivered",
+  [TASK_STATUS.FAILED]: "Failed"
+};
+
+function formatTaskDate(ts){
+  if (!ts?.toDate) return null;
+  const d = ts.toDate();
+  const datePart = d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
+  const timePart = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return `${datePart}, ${timePart}`;
+}
+
+function taskCardHTML(t){
+  const addr = t.address || "No address given";
+  const item = t.item || "Unnamed item";
+  const isUrgent = t.urgency === "urgent";
+  const createdStr = formatTaskDate(t.createdAt);
+  const completedStr = formatTaskDate(t.completedAt);
+  const isDone = t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED;
+  let actions = "";
+  if (t.status === TASK_STATUS.PENDING){
+    actions = `<button class="act-start" data-task-id="${t.id}" data-action="start">Start delivery</button>`;
+  } else if (t.status === TASK_STATUS.IN_PROGRESS){
+    actions = `
+      <button class="act-fail" data-task-id="${t.id}" data-action="fail">Couldn't deliver</button>
+      <button class="act-done" data-task-id="${t.id}" data-action="done">Mark delivered</button>`;
+  }
+
+  return `
+    <div class="task-card status-${t.status}">
+      <div class="task-inner">
+        <div class="task-top">
+          <div class="task-item">${escapeHTML(item)}</div>
+          <div style="display:flex; gap:6px; flex-shrink:0;">
+            ${isUrgent ? `<div class="task-badge badge-urgent">Urgent</div>` : ""}
+            <div class="task-badge badge-${t.status}">${statusLabel[t.status] || t.status}</div>
+          </div>
+        </div>
+        ${t.name ? `<div class="task-recipient">${escapeHTML(t.name)}</div>` : ""}
+        <div class="task-addr">${escapeHTML(addr)}</div>
+        ${t.notes ? `<div class="task-notes">${escapeHTML(t.notes)}</div>` : ""}
+        <div class="task-dates">
+          ${createdStr ? `<span>Created ${createdStr}</span>` : ""}
+          ${isDone && completedStr ? `<span>Completed ${completedStr}</span>` : ""}
+        </div>
+        ${actions ? `<div class="task-perf"></div><div class="task-actions">${actions}</div>` : ""}
+      </div>
+    </div>`;
+}
+
+function escapeHTML(str){
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+async function handleTaskAction(taskId, action){
+  const ref = doc(db, "tasks", taskId);
+  try {
+    if (action === "start"){
+      await updateDoc(ref, { status: TASK_STATUS.IN_PROGRESS, updatedAt: serverTimestamp() });
+    } else if (action === "done"){
+      await updateDoc(ref, { status: TASK_STATUS.DELIVERED, updatedAt: serverTimestamp(), completedAt: serverTimestamp() });
+    } else if (action === "fail"){
+      await updateDoc(ref, { status: TASK_STATUS.FAILED, updatedAt: serverTimestamp(), completedAt: serverTimestamp() });
+    }
+  } catch (e) {
+    console.error("Failed to update task:", e);
+    alert("Couldn't update that task — check your connection and try again.");
+  }
+}
+
+function startLocationSharing(uid){
+  if (!("geolocation" in navigator)){
+    document.getElementById("loc-status-text").textContent = "Location not supported on this device";
+    document.getElementById("loc-status-pill").classList.add("off");
+    document.getElementById("loc-pulse").style.background = "var(--red)";
+    return;
+  }
+
+  watchId = navigator.geolocation.watchPosition(
+    (pos) => { lastPosition = pos; },
+    (err) => { console.warn("Geolocation watch error:", err); },
+    { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+  );
+
+  const pushLocation = async () => {
+    if (!lastPosition) return;
+    try {
+      await setDoc(doc(db, "locations", uid), {
+        lat: lastPosition.coords.latitude,
+        lng: lastPosition.coords.longitude,
+        accuracy: lastPosition.coords.accuracy,
+        updatedAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.error("Failed to push location:", e);
+    }
+  };
+
+  pushLocation();
+  pingIntervalId = setInterval(pushLocation, LOCATION_PING_INTERVAL_MS);
+
+  document.getElementById("loc-status-text").textContent = "Location sharing on";
+  document.getElementById("loc-status-pill").classList.remove("off");
+}
+
+function stopLocationSharing(){
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  if (pingIntervalId !== null) clearInterval(pingIntervalId);
+  watchId = null;
+  pingIntervalId = null;
+  lastPosition = null;
+}
+
+document.addEventListener("visibilitychange", () => {
+  const pill = document.getElementById("loc-status-pill");
+  const text = document.getElementById("loc-status-text");
+  if (!currentRunner) return;
+  if (document.hidden){
+    text.textContent = "Paused — reopen the app to resume sharing";
+    pill.classList.add("off");
+  } else {
+    text.textContent = "Location sharing on";
+    pill.classList.remove("off");
+  }
+});
+</script>
+</body>
+</html>

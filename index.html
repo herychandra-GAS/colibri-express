@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colibri Dispatch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{
+    --bg:#060c18; --surface:#09111f; --surface2:#0d1828;
+    --border:#152035; --border2:#1e3050;
+    --ink:#c8d8ee; --ink-dim:#7a9abb; --ink-faint:#4a6888;
+    --amber:#f0a500; --amber-dim:#f0a50018;
+    --teal:#00c9a7; --teal-dim:#00c9a714;
+    --green:#4ade80; --green-dim:#4ade8014;
+    --rose:#fb7185; --rose-dim:#fb718514;
+    --blue:#38bdf8; --purple:#a78bfa;
+    --navy-0:var(--bg); --navy-1:var(--surface); --navy-2:var(--surface2); --navy-3:#122036;
+    --line:var(--border); --line-soft:var(--border);
+    --cyan:var(--teal); --red:var(--rose); --amber-dim2:#b87a18;
+    --panel-w: 480px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%; overflow-x:hidden;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:500;
+    -webkit-font-smoothing:antialiased;
+    position:relative;
+  }
+  body::before{
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.3;
+    background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+    background-size:40px 40px;
+  }
+  .display{font-family:'Barlow Condensed',sans-serif;font-weight:700;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace; font-weight:500;
+    letter-spacing:0.14em; text-transform:uppercase; font-size:10.5px; color:var(--ink-faint);
+  }
+
+  #app{display:flex; flex-direction:column; height:100vh; overflow:hidden; position:relative; z-index:1;}
+
+  header.top{
+    padding:0 24px; height:56px; flex-shrink:0;
+    border-bottom:1px solid var(--border2);
+    background:linear-gradient(180deg,#0d1018 0%,var(--bg) 100%);
+    display:flex; justify-content:space-between; align-items:center;
+    position:relative; z-index:3; gap:20px;
+  }
+  .header-stats{
+    display:flex; align-items:center; gap:20px; flex:1;
+    justify-content:center; min-width:0;
+  }
+  .header-stat{
+    display:flex; align-items:center; gap:7px;
+    font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-dim);
+    white-space:nowrap;
+  }
+  .header-stat strong{
+    font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:15px; color:var(--ink);
+  }
+  .header-stat .stat-dot{width:6px;height:6px;border-radius:50%; flex-shrink:0;}
+  .header-stat.stat-urgent strong{color:var(--rose);}
+  .header-stat.stat-online strong{color:var(--green);}
+  .header-stat-sep{width:1px; height:16px; background:var(--border2); flex-shrink:0;}
+  @media (max-width: 980px){
+    .header-stats{display:none;}
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand-mark{
+    width:30px;height:30px;border-radius:6px; background:var(--surface2);
+    border:1px solid var(--amber-dim2); color:var(--amber);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:15px;
+  }
+  .brand-name{font-size:20px; font-weight:600; color:var(--ink); letter-spacing:0.1em; text-transform:uppercase;}
+  .logo-dot{width:7px;height:7px;background:var(--amber);border-radius:50%;box-shadow:0 0 8px var(--amber);animation:pdot 2s ease-in-out infinite; flex-shrink:0;}
+  @keyframes pdot{0%,100%{opacity:1;box-shadow:0 0 8px var(--amber);}50%{opacity:.5;box-shadow:0 0 16px var(--amber);}}
+  .hd{width:1px;height:26px;background:var(--border2); flex-shrink:0;}
+
+  .new-task-btn{
+    background:var(--amber); color:var(--bg); border:none; border-radius:5px;
+    padding:8px 14px; font-family:'Barlow Condensed',sans-serif; font-weight:600;
+    font-size:12.5px; cursor:pointer; text-transform:uppercase; letter-spacing:0.08em;
+  }
+  .new-task-btn:active{transform:scale(0.97);}
+  .logout-btn{
+    background:transparent; color:var(--ink-faint); font-size:10.5px;
+    font-family:'IBM Plex Mono',monospace; letter-spacing:0.08em; padding:6px 10px;
+    text-transform:uppercase; border:1px solid var(--border2); border-radius:4px; cursor:pointer;
+  }
+  .logout-btn:hover{color:var(--ink); border-color:var(--ink-faint);}
+
+  #body-split{display:flex; flex:1; min-height:0;}
+
+  #map-wrap{
+    flex:1; min-width:0; min-height:0;
+    padding:16px 0 16px 16px;
+    display:flex; flex-direction:column; gap:12px;
+  }
+  #map{
+    width:100%; flex:1; min-height:0; background:#111;
+    border:1px solid var(--border2); border-radius:8px; overflow:hidden;
+  }
+
+  #runner-strip{
+    flex-shrink:0; height:112px;
+    display:flex; flex-direction:column;
+    background:var(--surface); border:1px solid var(--border2); border-radius:8px;
+    overflow:hidden;
+  }
+  .strip-header{
+    display:flex; align-items:center; gap:10px; padding:10px 14px;
+    border-bottom:1px solid var(--border2); flex-shrink:0;
+  }
+  .strip-header .eyebrow{margin:0;}
+  .strip-count{
+    font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink-faint);
+    background:var(--navy-2); border:1px solid var(--line); border-radius:100px; padding:1px 7px;
+  }
+  #runner-strip-scroll{
+    flex:1; min-height:0; display:flex; gap:10px; overflow-x:auto; overflow-y:hidden;
+    padding:10px 14px; align-items:stretch;
+  }
+  .runner-card{
+    flex-shrink:0; width:150px; height:100%;
+    background:var(--navy-2); border:1px solid var(--line);
+    border-radius:6px; padding:9px 11px; cursor:pointer;
+    display:flex; flex-direction:column; gap:4px; justify-content:center;
+    transition:border-color 0.15s ease, background 0.15s ease;
+  }
+  .runner-card:hover{border-color:var(--ink-faint);}
+  .runner-card.selected{border-color:var(--amber); background:var(--amber-dim);}
+  .runner-card-top{display:flex; align-items:center; gap:8px;}
+  .runner-card-avatar{
+    width:26px;height:26px;border-radius:50%; flex-shrink:0; position:relative;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;
+  }
+  .runner-card-dot{
+    position:absolute; bottom:-1px; right:-1px; width:8px;height:8px;border-radius:50%;
+    border:2px solid var(--navy-2);
+  }
+  .runner-card-dot.live{background:var(--green); box-shadow:0 0 4px var(--green);}
+  .runner-card-dot.stale{background:var(--ink-faint);}
+  .runner-card-name{
+    font-size:13px; font-weight:600; color:var(--ink);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .runner-card-count{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-faint);
+  }
+  .runner-card.all-runners{align-items:center;}
+  .runner-card.all-runners .runner-card-top{justify-content:center; width:100%;}
+  .strip-empty{
+    margin:auto; color:var(--ink-faint); font-size:12px; font-family:'IBM Plex Mono',monospace;
+  }
+
+  #panel{
+    width:var(--panel-w); min-width:var(--panel-w);
+    height:100%; overflow-y:auto;
+    background:var(--surface);
+    border-left:1px solid var(--border2);
+    box-shadow:-12px 0 24px -12px rgba(0,0,0,0.35);
+    display:flex; flex-direction:column;
+  }
+
+  .search-wrap{padding:14px 22px 0;}
+  .search-input{
+    width:100%; padding:10px 12px; border-radius:7px; border:1px solid var(--line);
+    background:var(--navy-2); color:var(--ink);
+    font-family:'IBM Plex Mono',monospace; font-size:12.5px;
+  }
+  .search-input::placeholder{color:var(--ink-faint);}
+  .search-input:focus{outline:none; border-color:var(--amber);}
+
+  .view-toggle-btn{
+    display:none;
+    background:transparent; color:var(--ink-dim); font-size:11px;
+    font-family:'IBM Plex Mono',monospace; letter-spacing:0.04em; padding:6px 10px;
+    text-transform:uppercase; border:1px solid var(--border2); border-radius:4px; cursor:pointer;
+  }
+  .view-toggle-btn:hover{color:var(--ink); border-color:var(--ink-faint);}
+
+  .list-section{padding:16px 22px 4px;}
+
+  .manifest-tabs{display:flex; gap:6px; margin-bottom:12px;}
+  .manifest-tab{
+    display:flex; align-items:center; gap:6px;
+    padding:7px 14px; border-radius:100px; border:1px solid var(--line);
+    background:var(--navy-2); color:var(--ink-dim); cursor:pointer;
+    font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:13px;
+    text-transform:uppercase; letter-spacing:0.03em;
+    transition:border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  }
+  .manifest-tab:hover{border-color:var(--ink-faint);}
+  .manifest-tab.selected{border-color:var(--amber); background:var(--amber-dim); color:var(--ink);}
+  .manifest-tab-count{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:inherit; opacity:0.75;
+  }
+
+  .completed-toggle{
+    display:flex; align-items:center; gap:8px; width:100%;
+    background:none; border:none; padding:0; margin:6px 0 10px; cursor:pointer;
+  }
+  .completed-count{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-faint);
+    background:var(--navy-2); border:1px solid var(--line); border-radius:100px;
+    padding:1px 8px;
+  }
+  .completed-chevron{
+    margin-left:auto; color:var(--ink-faint); font-size:12px;
+    transition:transform 0.15s ease;
+  }
+  .done-list-wrap{display:none;}
+  .done-list-wrap.open{display:block;}
+  .completed-toggle.open .completed-chevron{transform:rotate(180deg);}
+
+  .date-group-header{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.08em;
+    text-transform:uppercase; color:var(--ink-faint); margin:14px 0 8px;
+    padding-bottom:6px; border-bottom:1px solid var(--line);
+  }
+  .date-group-header:first-child{margin-top:0;}
+
+  .btn-show-more{
+    width:100%; margin-top:10px; padding:9px; border-radius:6px;
+    border:1px solid var(--line); background:var(--navy-2); color:var(--ink-dim);
+    cursor:pointer; font-family:'IBM Plex Mono',monospace; font-size:11.5px;
+    text-transform:uppercase; letter-spacing:0.04em;
+  }
+  .btn-show-more:hover{border-color:var(--amber); color:var(--ink);}
+
+  .runner-row{
+    display:flex; align-items:center; gap:10px; padding:10px 11px;
+    background:var(--navy-2); border:1px solid var(--line); border-radius:8px;
+    margin-bottom:8px;
+  }
+  .runner-row-avatar{
+    width:30px;height:30px;border-radius:50%; flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;
+  }
+  .runner-row-name{flex:1; font-size:14px; font-weight:600; color:var(--ink); min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .runner-row-actions{display:flex; gap:6px; flex-shrink:0;}
+  .runner-row-actions button{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; padding:5px 9px;
+    border-radius:5px; border:1px solid var(--line); background:var(--navy-1);
+    color:var(--ink-dim); cursor:pointer;
+  }
+  .runner-row-actions button:hover{border-color:var(--amber); color:var(--ink);}
+  .runner-row-actions .btn-delete-runner:hover{border-color:var(--rose) !important; color:var(--rose) !important;}
+  .btn-add-runner{
+    width:100%; margin-top:4px; padding:10px; border-radius:6px;
+    border:1px dashed var(--line); background:transparent; color:var(--ink-dim);
+    cursor:pointer; font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:13px;
+    text-transform:uppercase; letter-spacing:0.03em;
+  }
+  .btn-add-runner:hover{border-color:var(--amber); color:var(--ink);}
+
+  .housekeeping-section{padding-bottom:22px;}
+  .housekeeping-row{
+    display:flex; align-items:center; gap:8px; margin-bottom:10px;
+    font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--ink-dim);
+    flex-wrap:wrap;
+  }
+  .housekeeping-row input{
+    width:56px; padding:7px 8px; border:1px solid var(--line); border-radius:5px;
+    background:var(--navy-2); color:var(--ink); font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px; text-align:center;
+  }
+  .housekeeping-row input:focus{outline:none; border-color:var(--amber);}
+  .btn-housekeeping{
+    width:100%; padding:11px; border-radius:6px; border:1px solid rgba(251,113,133,0.4);
+    background:var(--rose-dim); color:var(--rose); cursor:pointer;
+    font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:13.5px;
+    text-transform:uppercase; letter-spacing:0.04em;
+  }
+  .btn-housekeeping:hover{background:rgba(251,113,133,0.22);}
+  .btn-housekeeping:disabled{opacity:0.5; cursor:default;}
+  .housekeeping-status{
+    margin-top:8px; font-family:'IBM Plex Mono',monospace; font-size:11.5px;
+    color:var(--ink-faint); min-height:16px;
+  }
+  .task-row{
+    background:var(--navy-2); border:1px solid var(--line); border-radius:8px;
+    padding:12px 14px; margin-bottom:8px; position:relative; overflow:hidden;
+    cursor:pointer;
+  }
+  .task-row::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+  }
+  .task-row.status-pending::before{background:var(--amber);}
+  .task-row.status-in_progress::before{background:var(--cyan);}
+  .task-row.status-delivered::before{background:var(--green);}
+  .task-row.status-failed::before{background:var(--red);}
+  .task-row-top{display:flex; justify-content:space-between; gap:8px; align-items:flex-start;}
+  .task-row-item{font-family: 'IBM Plex Mono', monospace;font-size:14px; font-weight:400; color:var(--ink);}
+  .task-row-badge{
+    font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:9.5px;
+    letter-spacing:0.05em; text-transform:uppercase; padding:3px 7px; border-radius:4px;
+    white-space:nowrap; height:fit-content; border:1px solid;
+  }
+  .badge-pending{background:rgba(245,166,35,0.1); color:var(--amber); border-color:rgba(245,166,35,0.35);}
+  .badge-in_progress{background:rgba(62,214,208,0.1); color:var(--cyan); border-color:rgba(62,214,208,0.35);}
+  .badge-delivered{background:rgba(74,222,128,0.1); color:var(--green); border-color:rgba(74,222,128,0.35);}
+  .badge-failed{background:rgba(242,84,91,0.1); color:var(--red); border-color:rgba(242,84,91,0.35);}
+  .badge-urgent{background:rgba(251,113,133,0.15); color:var(--rose); border-color:rgba(251,113,133,0.45);}
+  .badge-queued{background:rgba(122,154,187,0.12); color:var(--ink-dim); border-color:var(--line);}
+  .task-row-chevron{
+    color:var(--ink-faint); font-size:11px; flex-shrink:0; margin-top:2px;
+    transition:transform 0.15s ease;
+  }
+  .task-row.expanded .task-row-chevron{transform:rotate(180deg);}
+  .task-row-detail{display:none;}
+  .task-row.expanded .task-row-detail{display:block;}
+  .task-row-meta{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-faint); margin-top:5px;}
+  .task-row-notes{
+    font-size:12px; color:var(--ink-dim); margin-top:6px; padding:6px 9px;
+    background:var(--navy-1); border-left:2px solid var(--line); border-radius:3px;
+    font-style:italic; line-height:1.4;
+  }
+  .task-row-dates{
+    display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-faint);
+  }
+  .task-row-actions{margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;}
+  .task-row-actions button{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; padding:5px 9px;
+    border-radius:5px; border:1px solid var(--line); background:var(--navy-1);
+    color:var(--ink-dim); cursor:pointer;
+  }
+  .task-row-actions button:hover{border-color:var(--amber); color:var(--ink);}
+  .btn-delete-row{margin-left:auto;}
+  .btn-delete-row:hover{border-color:var(--rose) !important; color:var(--rose) !important;}
+  .btn-queue-toggle:hover{border-color:var(--teal) !important; color:var(--teal) !important;}
+  .empty-list{text-align:center; padding:32px 20px; color:var(--ink-faint); font-size:13px; font-family:'IBM Plex Mono',monospace;}
+
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(10,14,23,0.7);
+    display:none; align-items:center; justify-content:center; z-index:50;
+    padding:24px; overflow-y:auto;
+  }
+  .modal-backdrop.open{display:flex;}
+  .modal{
+    background:var(--navy-1); border:1px solid var(--line); border-radius:10px;
+    width:100%; max-width:420px;
+    padding:24px; max-height:88vh; overflow-y:auto;
+  }
+  .modal h2{font-family:'Barlow Condensed',sans-serif; font-size:24px; margin:0 0 4px; color:var(--ink);}
+  .modal p.sub{font-size:13px; color:var(--ink-faint); margin:0 0 20px; font-family:'IBM Plex Mono',monospace;}
+  .field-label{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.04em;
+    text-transform:uppercase; color:var(--ink-dim); margin-bottom:6px; display:block;
+  }
+  .field-label-optional{text-transform:none; letter-spacing:0; color:var(--ink-faint);}
+  .field-hint{
+    font-size:11.5px; color:var(--ink-faint); margin:-10px 0 14px; line-height:1.4;
+  }
+  .modal input, .modal select, .modal textarea{
+    width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:6px;
+    font-family:'IBM Plex Mono',monospace; font-size:13.5px; margin-bottom:14px;
+    background:var(--navy-2); color:var(--ink);
+  }
+  .modal input[type="date"]{color-scheme:dark;}
+  .modal textarea{resize:vertical; min-height:60px; max-height:160px; line-height:1.4;}
+  .modal input::placeholder, .modal textarea::placeholder{color:var(--ink-faint);}
+  .modal input:focus, .modal select:focus, .modal textarea:focus{outline:none; border-color:var(--amber);}
+
+  .urgency-toggle{display:flex; gap:8px; margin-bottom:14px;}
+  .urgency-btn{
+    flex:1; padding:10px; border-radius:6px; cursor:pointer;
+    font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:13.5px;
+    text-transform:uppercase; letter-spacing:0.04em;
+    background:var(--navy-2); border:1px solid var(--line); color:var(--ink-dim);
+    transition:all 0.15s ease;
+  }
+  .urgency-btn[data-urgency="normal"].selected{
+    background:var(--teal-dim); border-color:rgba(0,201,167,0.4); color:var(--teal);
+  }
+  .urgency-btn[data-urgency="urgent"].selected{
+    background:var(--rose-dim); border-color:rgba(251,113,133,0.4); color:var(--rose);
+  }
+
+  .modal-actions{display:flex; gap:8px; margin-top:6px;}
+  .modal-actions button{
+    flex:1; padding:12px; border-radius:6px; border:none; cursor:pointer;
+    font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:14px;
+    text-transform:uppercase; letter-spacing:0.04em;
+  }
+  .btn-cancel{background:var(--navy-3); color:var(--ink-dim);}
+  .btn-create{background:var(--amber); color:var(--navy-0);}
+
+  .reassign-options{display:flex; flex-direction:column; gap:8px; margin-bottom:6px;}
+  .reassign-option{
+    display:flex; align-items:center; gap:10px; width:100%;
+    padding:11px 12px; border-radius:8px; border:1px solid var(--line);
+    background:var(--navy-2); color:var(--ink); cursor:pointer; text-align:left;
+    font-family:'Rajdhani',sans-serif; font-weight:600; font-size:14.5px;
+    transition:border-color 0.15s ease, background 0.15s ease;
+  }
+  .reassign-option:hover{border-color:var(--amber);}
+  .reassign-option.current{border-color:var(--amber); background:var(--amber-dim);}
+  .reassign-option-avatar{
+    width:26px;height:26px;border-radius:50%; flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;
+  }
+  .reassign-option-name{flex:1;}
+  .reassign-option-dot{width:7px;height:7px;border-radius:50%; flex-shrink:0;}
+  .reassign-option-dot.live{background:var(--green); box-shadow:0 0 5px var(--green);}
+  .reassign-option-dot.stale{background:var(--ink-faint);}
+  .reassign-option-tag{
+    font-family:'IBM Plex Mono',monospace; font-size:9.5px; letter-spacing:0.05em;
+    text-transform:uppercase; color:var(--amber); flex-shrink:0;
+  }
+
+  .courier-label{
+    font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:11px;
+    background:var(--navy-1); color:var(--ink); padding:2px 6px; border-radius:4px;
+    border:1px solid var(--line); white-space:nowrap;
+  }
+
+  .leaflet-control-zoom a{
+    background:var(--navy-1) !important; color:var(--ink) !important; border-color:var(--line) !important;
+  }
+  .leaflet-control-attribution{
+    background:rgba(9,17,31,0.75) !important; color:var(--ink-faint) !important;
+  }
+  .leaflet-control-attribution a{ color:var(--ink-dim) !important; }
+
+  @media (max-width: 768px){
+    header.top{padding:0 14px; height:52px;}
+    .brand-name{font-size:11.5px;}
+    .brand-mark{width:26px;height:26px;font-size:13px;}
+    .hd{display:none;}
+    .new-task-btn{padding:7px 11px; font-size:11.5px;}
+    .logout-btn{padding:5px 8px; font-size:9.5px;}
+
+    .view-toggle-btn{display:inline-block;}
+
+    #body-split{position:relative; overflow:hidden;}
+    #map-wrap{
+      position:absolute; inset:0; padding:10px; z-index:1;
+      transition:transform 0.25s ease, opacity 0.25s ease;
+    }
+    #panel{
+      position:absolute; inset:0; width:100%; min-width:0; z-index:2;
+      transform:translateX(100%); transition:transform 0.25s ease;
+    }
+    #app.show-list #map-wrap{transform:translateX(-6%); opacity:0; pointer-events:none;}
+    #app.show-list #panel{transform:translateX(0);}
+
+    .roster{padding:12px 14px;}
+    .search-wrap{padding:10px 14px 0;}
+    .list-section{padding:14px 14px 4px;}
+
+    #runner-strip{height:96px;}
+    .runner-card{width:120px;}
+  }
+</style>
+<style>
+  .auth-screen{
+    position:fixed; inset:0; z-index:100;
+    background:var(--navy-0);
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size:40px 40px;
+    display:flex; align-items:center; justify-content:center;
+    padding:24px;
+  }
+  .auth-screen.hidden{display:none;}
+  .auth-card{width:100%; max-width:360px; text-align:left;}
+  .auth-card h1{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:32px; margin:0 0 6px; color:var(--ink);}
+  .auth-card p{color:var(--ink-dim); font-size:14px; margin:0 0 26px; font-family:'IBM Plex Mono',monospace; line-height:1.5;}
+  .btn-google{
+    width:100%; background:var(--ink); color:var(--navy-0); padding:14px; border-radius:6px;
+    font-size:15px; display:flex; align-items:center; justify-content:center; gap:10px;
+    font-family:'Rajdhani',sans-serif; font-weight:600; border:none; cursor:pointer;
+  }
+  .btn-google:active{transform:scale(0.98);}
+  .btn-cancel-full{
+    width:100%; background:var(--navy-2); border:1px solid var(--line); color:var(--ink-dim);
+    padding:14px; border-radius:6px; font-size:14px; margin-top:8px;
+    text-transform:uppercase; letter-spacing:0.04em; cursor:pointer;
+    font-family:'Barlow Condensed',sans-serif; font-weight:600;
+  }
+  .auth-error{color:var(--red); font-family:'IBM Plex Mono',monospace; font-size:12.5px; margin-top:12px; min-height:18px;}
+</style>
+</head>
+<body>
+
+<div class="auth-screen" id="login-screen">
+  <div class="auth-card">
+    <div class="brand" style="margin-bottom:24px;">
+      <div class="brand-mark">C</div>
+      <div class="brand-name">COLIBRI DISPATCH</div>
+    </div>
+    <h1>Sign in.</h1>
+    <p>Dispatcher access — sign in with your Google account.</p>
+    <button class="btn-google" id="google-login-btn">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.98v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.98A9 9 0 0 0 0 9c0 1.45.35 2.83.98 4.03l2.97-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .98 4.97L3.95 7.3C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+      <span>Sign in with Google</span>
+    </button>
+    <div class="auth-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="auth-screen hidden" id="denied-screen">
+  <div class="auth-card">
+    <div class="brand" style="margin-bottom:24px;">
+      <div class="brand-mark" style="border-color:var(--red); color:var(--red);">!</div>
+      <div class="brand-name">COLIBRI DISPATCH</div>
+    </div>
+    <h1 style="color:var(--red);">Access denied.</h1>
+    <p id="denied-detail">This account isn't authorized for dispatcher access.</p>
+    <button class="btn-cancel-full" id="denied-back-btn">Try a different account</button>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <header class="top">
+    <div class="brand">
+      <div class="logo-dot"></div>
+      <div class="brand-mark">C</div>
+      <div class="brand-name">Colibri Dispatch</div>
+    </div>
+    <div class="header-stats" id="header-stats"></div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <button class="view-toggle-btn" id="view-toggle-btn">Show list</button>
+      <button class="logout-btn" id="dispatcher-logout-btn">Sign out</button>
+      <button class="new-task-btn" id="open-new-task">+ New task</button>
+    </div>
+  </header>
+
+  <div id="body-split">
+    <div id="map-wrap">
+      <div id="map"></div>
+      <div id="runner-strip">
+        <div class="strip-header">
+          <span class="eyebrow">Runners</span>
+          <span class="strip-count" id="runner-strip-count">0</span>
+        </div>
+        <div id="runner-strip-scroll"></div>
+      </div>
+    </div>
+
+    <div id="panel">
+      <div class="search-wrap">
+        <input type="text" id="task-search" class="search-input" placeholder="Search item, name, address, runner...">
+      </div>
+
+    <div class="list-section">
+      <div class="manifest-tabs" id="manifest-tabs">
+        <button type="button" class="manifest-tab selected" data-tab="active">
+          Active <span class="manifest-tab-count" id="active-tab-count">0</span>
+        </button>
+        <button type="button" class="manifest-tab" data-tab="queued">
+          Queued <span class="manifest-tab-count" id="queued-tab-count">0</span>
+        </button>
+      </div>
+      <div id="active-list"></div>
+      <div id="queued-list" style="display:none;"></div>
+    </div>
+    <div class="list-section">
+      <button type="button" class="completed-toggle" id="completed-toggle">
+        <span class="eyebrow" style="margin:0;">Completed</span>
+        <span class="completed-count" id="completed-count">0</span>
+        <span class="completed-chevron" id="completed-chevron">▾</span>
+      </button>
+      <div id="done-list-wrap" class="done-list-wrap">
+        <div id="done-list"></div>
+        <button type="button" class="btn-show-more" id="show-more-done" style="display:none;">Show more</button>
+      </div>
+    </div>
+
+    <div class="list-section">
+      <button type="button" class="completed-toggle" id="runners-toggle">
+        <span class="eyebrow" style="margin:0;">Manage runners</span>
+        <span class="completed-count" id="runners-count">0</span>
+        <span class="completed-chevron" id="runners-chevron">▾</span>
+      </button>
+      <div id="runners-wrap" class="done-list-wrap">
+        <div id="runners-list"></div>
+        <button type="button" class="btn-add-runner" id="add-runner-btn">+ Add runner</button>
+      </div>
+    </div>
+
+    <div class="list-section housekeeping-section">
+      <div class="eyebrow" style="margin:14px 0 10px;">Housekeeping</div>
+      <div class="housekeeping-row">
+        <span>Delete tasks older than</span>
+        <input type="number" id="housekeeping-weeks" min="1" value="4">
+        <span>week(s)</span>
+      </div>
+      <button class="btn-housekeeping" id="housekeeping-run">Delete old tasks</button>
+      <div class="housekeeping-status" id="housekeeping-status"></div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="runner-modal-backdrop">
+  <div class="modal">
+    <h2 class="display" id="runner-modal-title">Add runner</h2>
+    <p class="sub" id="runner-modal-sub">Create a name and PIN for this runner.</p>
+
+    <label class="field-label">Name</label>
+    <input id="runner-name-input" placeholder="e.g. Rafli">
+
+    <label class="field-label">PIN <span class="field-label-optional">(6 digits)</span></label>
+    <input id="runner-pin-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="e.g. 481920">
+    <div class="field-hint" id="runner-pin-hint">The runner will use this PIN to sign in on their phone.</div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="runner-modal-cancel">Cancel</button>
+      <button class="btn-create" id="runner-modal-save">Save runner</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <h2 class="display" id="modal-title">New delivery</h2>
+    <p class="sub" id="modal-sub">Assign an item to a runner.</p>
+
+    <label class="field-label">Name</label>
+    <input id="task-name" placeholder="e.g. Budi Santoso">
+
+    <label class="field-label">Item / order</label>
+    <input id="task-item" placeholder="e.g. Wedding invitation cards — 500 pcs">
+
+    <label class="field-label">Delivery address</label>
+    <input id="task-address" placeholder="e.g. Jl. Sisingamangaraja No. 12">
+
+    <label class="field-label">Urgency</label>
+    <div class="urgency-toggle" id="urgency-toggle">
+      <button type="button" class="urgency-btn selected" data-urgency="normal">Normal</button>
+      <button type="button" class="urgency-btn" data-urgency="urgent">Urgent</button>
+    </div>
+
+    <label class="field-label">Assign to</label>
+    <select id="task-assignee"></select>
+
+    <label class="field-label">Notes</label>
+    <textarea id="task-notes" placeholder="e.g. Call before arriving, leave with security if not home"></textarea>
+
+    <label class="field-label">Release date <span class="field-label-optional">(optional)</span></label>
+    <input type="date" id="task-release-date">
+    <div class="field-hint" id="release-date-hint">Task stays queued until this date, then moves to Active automatically.</div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="cancel-task">Cancel</button>
+      <button class="btn-create" id="create-task">Create task</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="reassign-backdrop">
+  <div class="modal">
+    <h2 class="display">Reassign delivery</h2>
+    <p class="sub" id="reassign-sub">Choose a runner for this task.</p>
+
+    <div class="reassign-options" id="reassign-options"></div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="reassign-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, collection, doc, getDoc, addDoc, updateDoc, deleteDoc, onSnapshot,
+  serverTimestamp, query, orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCzdSRDykLVhCMLYXykhbnaVlNq64f3GE8",
+  authDomain: "colibri-express.firebaseapp.com",
+  projectId: "colibri-express",
+  storageBucket: "colibri-express.firebasestorage.app",
+  messagingSenderId: "960627210298",
+  appId: "1:960627210298:web:369a23c269207c7cb05d03"
+};
+const TASK_STATUS = {
+  PENDING: "pending", IN_PROGRESS: "in_progress",
+  DELIVERED: "delivered", FAILED: "failed"
+};
+const STALE_LOCATION_MS = 90000;
+
+// Only these Google accounts may reach the dispatcher app at all.
+// Being on this list does not by itself grant dispatcher role — that
+// still comes from their /employees/{uid}.role field being "dispatcher".
+// TODO: confirm this is the correct dispatcher whitelist for the new
+// colibri-express project — carried over from the old colibri-runner
+// project as a starting point, add/remove emails as needed.
+const ALLOWED_EMAILS = [
+  "hery.chandra@gmail.com",
+  "colibri.printing@gmail.com",
+  "angel7lee@gmail.com",
+  "mudacetak@gmail.com"
+];
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const googleProvider = new GoogleAuthProvider();
+
+const map = L.map("map", { zoomControl: true }).setView([3.5952, 98.6722], 13);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+  attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+  maxZoom: 20,
+  subdomains: "abcd"
+}).addTo(map);
+map.getPane("tilePane").style.filter = "brightness(1.9) contrast(0.85)";
+
+// Leaflet measures its container's size at init time. If the #app flex layout
+// or web fonts haven't finished painting yet, that measurement can come back
+// as 0 and the map renders blank until something forces a reflow (like
+// opening DevTools). Force a few recalculations to cover that race.
+requestAnimationFrame(() => map.invalidateSize());
+window.addEventListener("load", () => map.invalidateSize());
+setTimeout(() => map.invalidateSize(), 300);
+setTimeout(() => map.invalidateSize(), 1000);
+
+const courierMarkers = {};
+const courierColors = ["#F5A623", "#3ED6D0", "#4ADE80", "#F2545B", "#A78BFA"];
+let colorIdx = 0;
+const employeeColor = {};
+
+function colorFor(uid){
+  if (!employeeColor[uid]) employeeColor[uid] = courierColors[colorIdx++ % courierColors.length];
+  return employeeColor[uid];
+}
+
+// Hashes a PIN with SHA-256 via the browser's built-in Web Crypto API — no
+// external library needed. This is a client-side check (see project notes):
+// hashing avoids storing PINs in plaintext, but a determined party with
+// direct Firestore access could still attempt to brute-force a 6-digit PIN
+// against the hash. Acceptable for this internal-team use case; upgrading
+// to server-side verification (Cloud Function) later wouldn't require any
+// UI changes.
+async function hashPin(pin){
+  const data = new TextEncoder().encode(pin);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function makeIcon(color, initial){
+  return L.divIcon({
+    className: "",
+    html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+             background:${color};border:2px solid #0A0E17;box-shadow:0 2px 8px rgba(0,0,0,0.5);
+             display:flex;align-items:center;justify-content:center;">
+             <span style="transform:rotate(45deg);color:#0A0E17;font-family:'Barlow Condensed',sans-serif;
+               font-weight:700;font-size:13px;">${initial}</span>
+           </div>`,
+    iconSize:[30,30], iconAnchor:[15,30]
+  });
+}
+
+function showAuthScreen(id){
+  document.getElementById("login-screen").classList.add("hidden");
+  document.getElementById("denied-screen").classList.add("hidden");
+  document.getElementById("app").style.display = "none";
+  if (id === "app"){
+    document.getElementById("app").style.display = "flex";
+  } else {
+    document.getElementById(id).classList.remove("hidden");
+  }
+}
+
+document.getElementById("google-login-btn").addEventListener("click", async () => {
+  const errEl = document.getElementById("login-error");
+  errEl.textContent = "";
+  try {
+    await signInWithPopup(auth, googleProvider);
+  } catch (e) {
+    if (e.code !== "auth/popup-closed-by-user"){
+      errEl.textContent = "Sign-in failed — please try again.";
+      console.error(e);
+    }
+  }
+});
+
+document.getElementById("denied-back-btn").addEventListener("click", async () => {
+  await signOut(auth);
+  showAuthScreen("login-screen");
+});
+
+document.getElementById("dispatcher-logout-btn").addEventListener("click", async () => {
+  await signOut(auth);
+  showAuthScreen("login-screen");
+});
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user){
+    showAuthScreen("login-screen");
+    return;
+  }
+
+  const email = (user.email || "").toLowerCase();
+  if (!ALLOWED_EMAILS.includes(email)){
+    document.getElementById("denied-detail").textContent =
+      "This Google account isn't on the dispatcher access list.";
+    await signOut(auth);
+    showAuthScreen("denied-screen");
+    return;
+  }
+
+  const empDoc = await getDoc(doc(db, "employees", user.uid));
+  if (!empDoc.exists() || empDoc.data().role !== "dispatcher"){
+    document.getElementById("denied-detail").innerHTML = !empDoc.exists()
+      ? `Your account is allowed, but not registered yet.<br><br>Register this UID as a dispatcher in Firestore:<br><span class="mono" style="color:var(--ink); word-break:break-all;">${user.uid}</span>`
+      : "This account is registered, but not as a dispatcher.";
+    await signOut(auth);
+    showAuthScreen("denied-screen");
+    return;
+  }
+
+  showAuthScreen("app");
+  requestAnimationFrame(() => map.invalidateSize());
+  setTimeout(() => map.invalidateSize(), 150);
+  initDispatcher();
+});
+
+let employees = {};
+let tasksById = {};
+
+let dispatcherInitialized = false;
+function initDispatcher(){
+  if (dispatcherInitialized) return;
+  dispatcherInitialized = true;
+  subscribeEmployees();
+  subscribeLocations();
+  subscribeTasks();
+}
+
+function subscribeEmployees(){
+  onSnapshot(collection(db, "employees"), (snap) => {
+    employees = {};
+    snap.forEach(d => employees[d.id] = { id: d.id, ...d.data() });
+    renderRunnerStrip();
+    renderRunnersList();
+    populateAssigneeSelect();
+  });
+}
+
+let selectedEmployeeId = null;
+
+function renderRunnerStrip(){
+  const el = document.getElementById("runner-strip-scroll");
+  const ids = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
+
+  const activeCountFor = (uid) => Object.values(tasksById).filter(t =>
+    t.assignedTo === uid && t.queued !== true && (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS)
+  ).length;
+  const totalActive = Object.values(tasksById).filter(t =>
+    t.queued !== true && (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS)
+  ).length;
+
+  document.getElementById("runner-strip-count").textContent = ids.length;
+
+  el.innerHTML = `
+    <div class="runner-card all-runners ${selectedEmployeeId === null ? 'selected' : ''}" data-uid="">
+      <div class="runner-card-top">
+        <div class="runner-card-avatar" style="background:var(--navy-3); color:var(--ink-dim);">All</div>
+      </div>
+      <div class="runner-card-count" style="text-align:center;">${totalActive} active</div>
+    </div>` +
+    ids.map(id => {
+      const e = employees[id];
+      const initial = (e.name || "?").charAt(0).toUpperCase();
+      const isLive = lastLocationAge(id) < STALE_LOCATION_MS;
+      const count = activeCountFor(id);
+      return `
+        <div class="runner-card ${selectedEmployeeId === id ? 'selected' : ''}" data-uid="${id}">
+          <div class="runner-card-top">
+            <div class="runner-card-avatar" style="background:${colorFor(id)}22;color:${colorFor(id)}">
+              ${initial}
+              <div class="runner-card-dot ${isLive ? 'live' : 'stale'}"></div>
+            </div>
+            <div class="runner-card-name">${escapeHTML(e.name || "Runner")}</div>
+          </div>
+          <div class="runner-card-count">${count} active</div>
+        </div>`;
+    }).join("");
+
+  el.querySelectorAll("[data-uid]").forEach(card => {
+    card.addEventListener("click", () => {
+      selectedEmployeeId = card.dataset.uid || null;
+      donePageCount = DONE_PAGE_SIZE;
+      renderRunnerStrip();
+      renderTaskLists();
+      if (selectedEmployeeId && courierMarkers[selectedEmployeeId]){
+        map.setView(courierMarkers[selectedEmployeeId].getLatLng(), 15);
+      }
+    });
+  });
+}
+
+function populateAssigneeSelect(){
+  const sel = document.getElementById("task-assignee");
+  const ids = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
+  sel.innerHTML = ids.map(id => `<option value="${id}">${escapeHTML(employees[id].name || "Runner")}</option>`).join("");
+}
+
+const locationUpdatedAt = {};
+
+function lastLocationAge(uid){
+  const t = locationUpdatedAt[uid];
+  return t ? (Date.now() - t) : Infinity;
+}
+
+function subscribeLocations(){
+  onSnapshot(collection(db, "locations"), (snap) => {
+    snap.forEach(d => {
+      const data = d.data();
+      const uid = d.id;
+      if (!data.lat || !data.lng) return;
+
+      locationUpdatedAt[uid] = data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now();
+
+      const name = employees[uid]?.name || "Runner";
+      const initial = name.charAt(0).toUpperCase();
+      const latlng = [data.lat, data.lng];
+
+      if (courierMarkers[uid]){
+        courierMarkers[uid].setLatLng(latlng);
+      } else {
+        courierMarkers[uid] = L.marker(latlng, { icon: makeIcon(colorFor(uid), initial) })
+          .addTo(map)
+          .bindTooltip(name, { direction: "top", offset: [0,-28], className: "courier-label" });
+      }
+    });
+    renderRunnerStrip();
+    renderHeaderStats();
+  });
+}
+
+function subscribeTasks(){
+  const q = query(collection(db, "tasks"), orderBy("createdAt", "desc"));
+  onSnapshot(q, (snap) => {
+    tasksById = {};
+    snap.forEach(d => tasksById[d.id] = { id: d.id, ...d.data() });
+    releaseDueTasks();
+    renderTaskLists();
+  });
+}
+
+// Queued tasks with a releaseDate ("YYYY-MM-DD") automatically move to
+// Active once that calendar date arrives — compared as local dates, not
+// exact timestamps, since there's no time component on the field. This
+// only fires while a dispatcher has the app open (no server-side cron),
+// so a task can sit queued a little past its date if nobody's looking;
+// it always catches up the moment the app is next opened or this check
+// next runs.
+let releaseCheckInFlight = false;
+async function releaseDueTasks(){
+  if (releaseCheckInFlight) return;
+  const todayStr = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local time
+  const due = Object.values(tasksById).filter(t =>
+    t.queued === true && t.releaseDate && t.releaseDate <= todayStr
+  );
+  if (due.length === 0) return;
+
+  releaseCheckInFlight = true;
+  try {
+    for (const t of due){
+      await updateDoc(doc(db, "tasks", t.id), { queued: false, updatedAt: serverTimestamp() });
+    }
+  } catch (e) {
+    console.error("Failed to auto-release scheduled task:", e);
+  } finally {
+    releaseCheckInFlight = false;
+  }
+}
+
+setInterval(releaseDueTasks, 60000);
+
+let searchQuery = "";
+const DONE_PAGE_SIZE = 15;
+let donePageCount = DONE_PAGE_SIZE;
+
+function dateGroupLabel(ts){
+  if (!ts?.toDate) return "Older";
+  const d = ts.toDate();
+  const now = new Date();
+  const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+
+  if (dayDiff <= 0) return "Today";
+  if (dayDiff === 1) return "Yesterday";
+  if (dayDiff <= 7) return "This week";
+  return "Older";
+}
+
+function groupDoneTasks(done){
+  const order = ["Today", "Yesterday", "This week", "Older"];
+  const groups = {};
+  done.forEach(t => {
+    const label = dateGroupLabel(t.completedAt || t.createdAt);
+    (groups[label] = groups[label] || []).push(t);
+  });
+  return order.filter(label => groups[label]?.length).map(label => ({ label, tasks: groups[label] }));
+}
+
+function renderHeaderStats(){
+  const allTasks = Object.values(tasksById);
+  const isLiveActive = (t) => (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS) && t.queued !== true;
+  const activeCount = allTasks.filter(isLiveActive).length;
+  const urgentCount = allTasks.filter(t => isLiveActive(t) && t.urgency === "urgent").length;
+  const runnerIds = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
+  const onlineCount = runnerIds.filter(id => lastLocationAge(id) < STALE_LOCATION_MS).length;
+
+  document.getElementById("header-stats").innerHTML = `
+    <div class="header-stat"><strong>${activeCount}</strong> active</div>
+    <div class="header-stat-sep"></div>
+    <div class="header-stat stat-urgent"><strong>${urgentCount}</strong> urgent</div>
+    <div class="header-stat-sep"></div>
+    <div class="header-stat stat-online"><span class="stat-dot" style="background:var(--green); box-shadow:0 0 4px var(--green);"></span><strong>${onlineCount}</strong>/${runnerIds.length} runners online</div>
+  `;
+}
+
+function renderTaskLists(){
+  renderHeaderStats();
+  renderRunnerStrip();
+
+  let tasks = Object.values(tasksById);
+  if (selectedEmployeeId) tasks = tasks.filter(t => t.assignedTo === selectedEmployeeId);
+
+  if (searchQuery){
+    const q = searchQuery.toLowerCase();
+    tasks = tasks.filter(t => {
+      const assigneeName = employees[t.assignedTo]?.name || "";
+      return (t.item || "").toLowerCase().includes(q)
+        || (t.name || "").toLowerCase().includes(q)
+        || (t.address || "").toLowerCase().includes(q)
+        || (t.notes || "").toLowerCase().includes(q)
+        || assigneeName.toLowerCase().includes(q);
+    });
+  }
+
+  const activeAndQueued = tasks.filter(t => t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.IN_PROGRESS);
+  const active = activeAndQueued.filter(t => t.queued !== true);
+  const queued = activeAndQueued.filter(t => t.queued === true);
+  const done = tasks.filter(t => t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED);
+  done.sort((a, b) => {
+    const aMs = (a.completedAt || a.createdAt)?.toMillis ? (a.completedAt || a.createdAt).toMillis() : 0;
+    const bMs = (b.completedAt || b.createdAt)?.toMillis ? (b.completedAt || b.createdAt).toMillis() : 0;
+    return bMs - aMs;
+  });
+
+  document.getElementById("active-list").innerHTML = active.length
+    ? active.map(taskRowHTML).join("")
+    : `<div class="empty-list">${searchQuery ? "No matching active deliveries." : "No active deliveries."}</div>`;
+  document.getElementById("queued-list").innerHTML = queued.length
+    ? queued.map(taskRowHTML).join("")
+    : `<div class="empty-list">${searchQuery ? "No matching queued tasks." : "Nothing queued."}</div>`;
+  document.getElementById("active-tab-count").textContent = active.length;
+  document.getElementById("queued-tab-count").textContent = queued.length;
+
+  document.getElementById("completed-count").textContent = done.length;
+
+  const isSearching = !!searchQuery;
+  const visibleDone = isSearching ? done : done.slice(0, donePageCount);
+  const hasMore = !isSearching && done.length > donePageCount;
+
+  if (done.length === 0){
+    document.getElementById("done-list").innerHTML =
+      `<div class="empty-list">${searchQuery ? "No matching completed tasks." : "Nothing completed yet."}</div>`;
+  } else if (isSearching){
+    // Flat list while searching — no date grouping, so matches aren't buried under collapsed groups.
+    document.getElementById("done-list").innerHTML = visibleDone.map(taskRowHTML).join("");
+  } else {
+    document.getElementById("done-list").innerHTML = groupDoneTasks(visibleDone).map(g => `
+      <div class="date-group-header">${g.label} · ${g.tasks.length}</div>
+      ${g.tasks.map(taskRowHTML).join("")}
+    `).join("");
+  }
+
+  document.getElementById("show-more-done").style.display = hasMore ? "block" : "none";
+
+  // Auto-expand the completed section while actively searching, so matches
+  // aren't hidden behind the collapsed toggle; otherwise leave it as the
+  // user last set it.
+  const doneWrap = document.getElementById("done-list-wrap");
+  const toggleBtn = document.getElementById("completed-toggle");
+  if (isSearching && done.length){
+    doneWrap.classList.add("open");
+    toggleBtn.classList.add("open");
+  }
+
+  document.querySelectorAll("[data-reassign]").forEach(btn => {
+    btn.addEventListener("click", (e) => { e.stopPropagation(); openReassignPrompt(btn.dataset.reassign); });
+  });
+  document.querySelectorAll("[data-delete]").forEach(btn => {
+    btn.addEventListener("click", (e) => { e.stopPropagation(); deleteTask(btn.dataset.delete); });
+  });
+  document.querySelectorAll("[data-edit]").forEach(btn => {
+    btn.addEventListener("click", (e) => { e.stopPropagation(); openEditModal(btn.dataset.edit); });
+  });
+  document.querySelectorAll("[data-queue-toggle]").forEach(btn => {
+    btn.addEventListener("click", (e) => { e.stopPropagation(); toggleQueued(btn.dataset.queueToggle); });
+  });
+  document.querySelectorAll("[data-task-toggle]").forEach(row => {
+    row.addEventListener("click", () => {
+      const id = row.dataset.taskToggle;
+      if (expandedTaskIds.has(id)) expandedTaskIds.delete(id);
+      else expandedTaskIds.add(id);
+      row.classList.toggle("expanded");
+    });
+  });
+}
+
+async function toggleQueued(taskId){
+  const t = tasksById[taskId];
+  if (!t) return;
+  const movingToQueued = !(t.queued === true);
+
+  const update = {
+    queued: movingToQueued,
+    updatedAt: serverTimestamp()
+  };
+  // Re-queuing clears any old release date — otherwise a past-due date
+  // would make releaseDueTasks() snap it right back to Active within the
+  // minute, silently undoing the manual move.
+  if (movingToQueued) update.releaseDate = null;
+
+  await updateDoc(doc(db, "tasks", taskId), update);
+}
+
+async function deleteTask(taskId){
+  const t = tasksById[taskId];
+  const label = t?.item || "this task";
+  if (!confirm(`Delete "${label}"? This can't be undone.`)) return;
+  try {
+    await deleteDoc(doc(db, "tasks", taskId));
+  } catch (e) {
+    console.error("Failed to delete task:", e);
+    alert("Couldn't delete that task — check your connection and try again.");
+  }
+}
+
+function renderRunnersList(){
+  const ids = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
+  document.getElementById("runners-count").textContent = ids.length;
+
+  const listEl = document.getElementById("runners-list");
+  listEl.innerHTML = ids.length
+    ? ids.map(id => {
+        const e = employees[id];
+        const initial = (e.name || "?").charAt(0).toUpperCase();
+        return `
+          <div class="runner-row">
+            <div class="runner-row-avatar" style="background:${colorFor(id)}22;color:${colorFor(id)}">${initial}</div>
+            <div class="runner-row-name">${escapeHTML(e.name || "Unnamed runner")}</div>
+            <div class="runner-row-actions">
+              <button data-edit-runner="${id}">Edit</button>
+              <button class="btn-delete-runner" data-delete-runner="${id}">Delete</button>
+            </div>
+          </div>`;
+      }).join("")
+    : `<div class="empty-list">No runners yet.</div>`;
+
+  listEl.querySelectorAll("[data-edit-runner]").forEach(btn => {
+    btn.addEventListener("click", () => openRunnerModal(btn.dataset.editRunner));
+  });
+  listEl.querySelectorAll("[data-delete-runner]").forEach(btn => {
+    btn.addEventListener("click", () => deleteRunner(btn.dataset.deleteRunner));
+  });
+}
+
+async function deleteRunner(runnerId){
+  const name = employees[runnerId]?.name || "this runner";
+  if (!confirm(`Delete "${name}"? They won't be able to sign in anymore. This can't be undone.`)) return;
+  try {
+    await deleteDoc(doc(db, "employees", runnerId));
+  } catch (e) {
+    console.error("Failed to delete runner:", e);
+    alert("Couldn't delete that runner — check your connection and try again.");
+  }
+}
+
+const runnerBackdrop = document.getElementById("runner-modal-backdrop");
+let editingRunnerId = null;
+
+function openRunnerModal(runnerId){
+  editingRunnerId = runnerId || null;
+  const nameInput = document.getElementById("runner-name-input");
+  const pinInput = document.getElementById("runner-pin-input");
+  const hintEl = document.getElementById("runner-pin-hint");
+
+  if (editingRunnerId){
+    const e = employees[editingRunnerId];
+    nameInput.value = e?.name || "";
+    pinInput.value = "";
+    document.getElementById("runner-modal-title").textContent = "Edit runner";
+    document.getElementById("runner-modal-sub").textContent = "Update this runner's name or PIN.";
+    hintEl.textContent = "Leave blank to keep their current PIN unchanged.";
+  } else {
+    nameInput.value = "";
+    pinInput.value = "";
+    document.getElementById("runner-modal-title").textContent = "Add runner";
+    document.getElementById("runner-modal-sub").textContent = "Create a name and PIN for this runner.";
+    hintEl.textContent = "The runner will use this PIN to sign in on their phone.";
+  }
+  runnerBackdrop.classList.add("open");
+}
+
+document.getElementById("add-runner-btn").addEventListener("click", () => openRunnerModal(null));
+document.getElementById("runner-modal-cancel").addEventListener("click", () => {
+  runnerBackdrop.classList.remove("open");
+});
+
+// Only digits, capped at 6 characters, while typing.
+document.getElementById("runner-pin-input").addEventListener("input", (e) => {
+  e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
+});
+
+document.getElementById("runner-modal-save").addEventListener("click", async () => {
+  const name = document.getElementById("runner-name-input").value.trim();
+  const pin = document.getElementById("runner-pin-input").value.trim();
+
+  if (!name){
+    alert("Enter a name for this runner.");
+    return;
+  }
+  if (!editingRunnerId && pin.length !== 6){
+    alert("PIN must be exactly 6 digits.");
+    return;
+  }
+  if (pin && pin.length !== 6){
+    alert("PIN must be exactly 6 digits (or leave blank to keep the current one).");
+    return;
+  }
+
+  const update = { name, role: "runner", updatedAt: serverTimestamp() };
+  if (pin) update.pinHash = await hashPin(pin);
+
+  try {
+    if (editingRunnerId){
+      await updateDoc(doc(db, "employees", editingRunnerId), update);
+    } else {
+      update.createdAt = serverTimestamp();
+      await addDoc(collection(db, "employees"), update);
+    }
+    runnerBackdrop.classList.remove("open");
+  } catch (e) {
+    console.error("Failed to save runner:", e);
+    alert("Couldn't save that runner — check your connection and try again.");
+  }
+});
+
+document.getElementById("runners-toggle").addEventListener("click", (e) => {
+  const wrap = document.getElementById("runners-wrap");
+  const isOpen = wrap.classList.toggle("open");
+  e.currentTarget.classList.toggle("open", isOpen);
+});
+
+document.getElementById("housekeeping-run").addEventListener("click", async () => {
+  const weeksInput = document.getElementById("housekeeping-weeks");
+  const statusEl = document.getElementById("housekeeping-status");
+  const runBtn = document.getElementById("housekeeping-run");
+
+  const weeks = parseFloat(weeksInput.value);
+  if (!weeks || weeks <= 0){
+    statusEl.textContent = "Enter a valid number of weeks.";
+    statusEl.style.color = "var(--rose)";
+    return;
+  }
+
+  const cutoffMs = Date.now() - weeks * 7 * 24 * 60 * 60 * 1000;
+  const stale = Object.values(tasksById).filter(t => {
+    const createdMs = t.createdAt?.toMillis ? t.createdAt.toMillis() : null;
+    return createdMs !== null && createdMs < cutoffMs;
+  });
+
+  if (stale.length === 0){
+    statusEl.textContent = "No tasks older than that.";
+    statusEl.style.color = "var(--ink-faint)";
+    return;
+  }
+
+  if (!confirm(`Delete ${stale.length} task(s) older than ${weeks} week(s)? This can't be undone.`)) return;
+
+  runBtn.disabled = true;
+  statusEl.textContent = `Deleting ${stale.length} task(s)...`;
+  statusEl.style.color = "var(--ink-faint)";
+
+  let deleted = 0, failed = 0;
+  for (const t of stale){
+    try {
+      await deleteDoc(doc(db, "tasks", t.id));
+      deleted++;
+    } catch (e) {
+      console.error("Failed to delete task during housekeeping:", t.id, e);
+      failed++;
+    }
+  }
+
+  runBtn.disabled = false;
+  statusEl.textContent = failed > 0
+    ? `Deleted ${deleted} task(s), ${failed} failed — try again.`
+    : `Deleted ${deleted} task(s).`;
+  statusEl.style.color = failed > 0 ? "var(--rose)" : "var(--green)";
+});
+
+const statusLabel = {
+  pending: "Pending", in_progress: "In progress", delivered: "Delivered", failed: "Failed"
+};
+
+function formatTaskDate(ts){
+  if (!ts?.toDate) return null;
+  const d = ts.toDate();
+  const datePart = d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
+  const timePart = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return `${datePart}, ${timePart}`;
+}
+
+const expandedTaskIds = new Set();
+
+function formatReleaseDate(dateStr){
+  if (!dateStr) return null;
+  // Parse as local date (not UTC) so it matches what the dispatcher picked.
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function taskRowHTML(t){
+  const assignee = employees[t.assignedTo]?.name || "Unassigned";
+  const isUrgent = t.urgency === "urgent";
+  const isQueued = t.queued === true;
+  const createdStr = formatTaskDate(t.createdAt);
+  const completedStr = formatTaskDate(t.completedAt);
+  const releaseStr = formatReleaseDate(t.releaseDate);
+  const isDone = t.status === TASK_STATUS.DELIVERED || t.status === TASK_STATUS.FAILED;
+  const isExpanded = expandedTaskIds.has(t.id);
+
+  return `
+    <div class="task-row status-${t.status} ${isExpanded ? 'expanded' : ''}" data-task-toggle="${t.id}">
+      <div class="task-row-top">
+        <div class="task-row-item">${escapeHTML(t.item || "Unnamed item")}</div>
+        <div style="display:flex; gap:6px; flex-shrink:0; align-items:flex-start;">
+          ${isQueued ? `<div class="task-row-badge badge-queued">Queued</div>` : ""}
+          ${isUrgent ? `<div class="task-row-badge badge-urgent">Urgent</div>` : ""}
+          <div class="task-row-badge badge-${t.status}">${statusLabel[t.status] || t.status}</div>
+          <span class="task-row-chevron">▾</span>
+        </div>
+      </div>
+      <div class="task-row-detail">
+        <div class="task-row-meta">${t.name ? escapeHTML(t.name) + " · " : ""}${escapeHTML(assignee)} · ${escapeHTML(t.address || "No address")}</div>
+        ${t.notes ? `<div class="task-row-notes">${escapeHTML(t.notes)}</div>` : ""}
+        <div class="task-row-dates">
+          ${createdStr ? `<span>Created ${createdStr}</span>` : ""}
+          ${isQueued && releaseStr ? `<span>Releases ${releaseStr}</span>` : ""}
+          ${isDone && completedStr ? `<span>Completed ${completedStr}</span>` : ""}
+        </div>
+        <div class="task-row-actions">
+          <button data-edit="${t.id}">Edit</button>
+          ${!isDone ? `<button data-reassign="${t.id}">Reassign</button>` : ""}
+          ${!isDone ? `<button class="btn-queue-toggle" data-queue-toggle="${t.id}">${isQueued ? "Move to active" : "Move to queue"}</button>` : ""}
+          <button class="btn-delete-row" data-delete="${t.id}">Delete</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+const reassignBackdrop = document.getElementById("reassign-backdrop");
+let reassignTaskId = null;
+
+async function openReassignPrompt(taskId){
+  const t = tasksById[taskId];
+  if (!t) return;
+  reassignTaskId = taskId;
+
+  const ids = Object.keys(employees).filter(id => employees[id].role !== "dispatcher");
+  const optionsEl = document.getElementById("reassign-options");
+
+  document.getElementById("reassign-sub").textContent = t.item
+    ? `Choose a runner for "${t.item}".`
+    : "Choose a runner for this task.";
+
+  optionsEl.innerHTML = ids.length
+    ? ids.map(id => {
+        const e = employees[id];
+        const initial = (e.name || "?").charAt(0).toUpperCase();
+        const isLive = lastLocationAge(id) < STALE_LOCATION_MS;
+        const isCurrent = id === t.assignedTo;
+        return `
+          <button type="button" class="reassign-option ${isCurrent ? 'current' : ''}" data-assign-id="${id}">
+            <div class="reassign-option-avatar" style="background:${colorFor(id)}22;color:${colorFor(id)}">${initial}</div>
+            <span class="reassign-option-name">${escapeHTML(e.name || "Runner")}</span>
+            ${isCurrent ? `<span class="reassign-option-tag">Current</span>` : ""}
+            <div class="reassign-option-dot ${isLive ? 'live' : 'stale'}"></div>
+          </button>`;
+      }).join("")
+    : `<div class="empty-list">No runners available.</div>`;
+
+  optionsEl.querySelectorAll("[data-assign-id]").forEach(btn => {
+    btn.addEventListener("click", () => confirmReassign(btn.dataset.assignId));
+  });
+
+  reassignBackdrop.classList.add("open");
+}
+
+async function confirmReassign(targetId){
+  if (!reassignTaskId || !targetId) return;
+  await updateDoc(doc(db, "tasks", reassignTaskId), {
+    assignedTo: targetId, status: TASK_STATUS.PENDING, updatedAt: serverTimestamp()
+  });
+  reassignBackdrop.classList.remove("open");
+  reassignTaskId = null;
+}
+
+document.getElementById("reassign-cancel").addEventListener("click", () => {
+  reassignBackdrop.classList.remove("open");
+  reassignTaskId = null;
+});
+
+const backdrop = document.getElementById("modal-backdrop");
+let editingTaskId = null;
+
+function resetTaskForm(){
+  document.getElementById("task-name").value = "";
+  document.getElementById("task-item").value = "";
+  document.getElementById("task-address").value = "";
+  document.getElementById("task-notes").value = "";
+  document.getElementById("task-release-date").value = "";
+  selectedUrgency = "normal";
+  document.querySelectorAll(".urgency-btn").forEach(b => b.classList.toggle("selected", b.dataset.urgency === "normal"));
+  if (document.getElementById("task-assignee").options.length) {
+    document.getElementById("task-assignee").selectedIndex = 0;
+  }
+}
+
+const DEFAULT_RELEASE_HINT = "Task stays queued until this date, then moves to Active automatically.";
+const REQUEUE_RELEASE_HINT = "This task is currently active. Setting a date here will move it back to Queued until then.";
+let editingTaskWasActive = false;
+
+function openCreateModal(){
+  editingTaskId = null;
+  editingTaskWasActive = false;
+  resetTaskForm();
+  document.getElementById("modal-title").textContent = "New delivery";
+  document.getElementById("modal-sub").textContent = "Assign an item to a runner.";
+  document.getElementById("create-task").textContent = "Create task";
+  document.getElementById("release-date-hint").textContent = DEFAULT_RELEASE_HINT;
+  backdrop.classList.add("open");
+}
+
+function openEditModal(taskId){
+  const t = tasksById[taskId];
+  if (!t) return;
+  editingTaskId = taskId;
+  editingTaskWasActive = t.queued !== true;
+
+  document.getElementById("task-name").value = t.name || "";
+  document.getElementById("task-item").value = t.item || "";
+  document.getElementById("task-address").value = t.address || "";
+  document.getElementById("task-notes").value = t.notes || "";
+  document.getElementById("task-release-date").value = t.releaseDate || "";
+  document.getElementById("task-assignee").value = t.assignedTo || "";
+
+  selectedUrgency = t.urgency === "urgent" ? "urgent" : "normal";
+  document.querySelectorAll(".urgency-btn").forEach(b => b.classList.toggle("selected", b.dataset.urgency === selectedUrgency));
+
+  document.getElementById("modal-title").textContent = "Edit delivery";
+  document.getElementById("modal-sub").textContent = "Update this task's details.";
+  document.getElementById("create-task").textContent = "Save changes";
+  document.getElementById("release-date-hint").textContent =
+    editingTaskWasActive ? REQUEUE_RELEASE_HINT : DEFAULT_RELEASE_HINT;
+  backdrop.classList.add("open");
+}
+
+document.getElementById("open-new-task").addEventListener("click", openCreateModal);
+
+document.getElementById("task-release-date").addEventListener("input", (e) => {
+  const hintEl = document.getElementById("release-date-hint");
+  if (editingTaskWasActive && e.target.value){
+    hintEl.textContent = REQUEUE_RELEASE_HINT;
+  } else if (editingTaskWasActive && !e.target.value){
+    hintEl.textContent = "This task is currently active and will stay active.";
+  } else {
+    hintEl.textContent = DEFAULT_RELEASE_HINT;
+  }
+});
+document.getElementById("cancel-task").addEventListener("click", () => backdrop.classList.remove("open"));
+
+document.getElementById("task-search").addEventListener("input", (e) => {
+  searchQuery = e.target.value.trim();
+  donePageCount = DONE_PAGE_SIZE;
+  renderTaskLists();
+});
+
+document.getElementById("completed-toggle").addEventListener("click", (e) => {
+  const wrap = document.getElementById("done-list-wrap");
+  const isOpen = wrap.classList.toggle("open");
+  e.currentTarget.classList.toggle("open", isOpen);
+});
+
+document.getElementById("show-more-done").addEventListener("click", () => {
+  donePageCount += DONE_PAGE_SIZE;
+  renderTaskLists();
+});
+
+document.getElementById("manifest-tabs").addEventListener("click", (e) => {
+  const tabBtn = e.target.closest(".manifest-tab");
+  if (!tabBtn) return;
+  const tab = tabBtn.dataset.tab;
+  document.querySelectorAll(".manifest-tab").forEach(b => b.classList.toggle("selected", b === tabBtn));
+  document.getElementById("active-list").style.display = tab === "active" ? "block" : "none";
+  document.getElementById("queued-list").style.display = tab === "queued" ? "block" : "none";
+});
+
+const appEl = document.getElementById("app");
+const viewToggleBtn = document.getElementById("view-toggle-btn");
+viewToggleBtn.addEventListener("click", () => {
+  const showingList = appEl.classList.toggle("show-list");
+  viewToggleBtn.textContent = showingList ? "Show map" : "Show list";
+  if (!showingList) requestAnimationFrame(() => map.invalidateSize());
+});
+
+let selectedUrgency = "normal";
+document.querySelectorAll(".urgency-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    selectedUrgency = btn.dataset.urgency;
+    document.querySelectorAll(".urgency-btn").forEach(b => b.classList.toggle("selected", b === btn));
+  });
+});
+
+document.getElementById("create-task").addEventListener("click", async () => {
+  const name = document.getElementById("task-name").value.trim();
+  const item = document.getElementById("task-item").value.trim();
+  const address = document.getElementById("task-address").value.trim();
+  const assignedTo = document.getElementById("task-assignee").value;
+  const urgency = selectedUrgency;
+  const notes = document.getElementById("task-notes").value.trim();
+  const releaseDate = document.getElementById("task-release-date").value || null;
+
+  if (!item || !assignedTo){
+    alert("Add an item and pick a runner before saving the task.");
+    return;
+  }
+
+  if (editingTaskId){
+    const update = {
+      name, item, address, assignedTo, urgency, notes, releaseDate,
+      updatedAt: serverTimestamp()
+    };
+    // Editing an active task to add a release date means "hold this until
+    // then" — so it has to actually move back to Queued, or the date would
+    // silently do nothing (releaseDueTasks only ever looks at queued tasks).
+    if (editingTaskWasActive && releaseDate){
+      update.queued = true;
+    }
+    await updateDoc(doc(db, "tasks", editingTaskId), update);
+  } else {
+    await addDoc(collection(db, "tasks"), {
+      name, item, address, assignedTo, urgency, notes, releaseDate,
+      status: TASK_STATUS.PENDING,
+      queued: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  }
+
+  editingTaskId = null;
+  editingTaskWasActive = false;
+  resetTaskForm();
+  backdrop.classList.remove("open");
+});
+
+function escapeHTML(str){
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+setInterval(() => { renderRunnerStrip(); renderHeaderStats(); }, 15000);
+</script>
+</body>
+</html>
