@@ -685,7 +685,7 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot,
+  getFirestore, collection, doc, getDoc, addDoc, updateDoc, deleteDoc, onSnapshot,
   serverTimestamp, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -948,8 +948,6 @@ function subscribeLocations(){
           .bindTooltip(name, { direction: "top", offset: [0,-28], className: "courier-label" });
       }
     });
-    // TEMP DEBUG — remove after diagnosing the online-dot issue.
-    window._debug = { employees, locationUpdatedAt, lastLocationAge, STALE_LOCATION_MS, db, collection, query, orderBy, getDocs };
     renderRunnerStrip();
     renderHeaderStats();
   });
